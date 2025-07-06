@@ -10,6 +10,16 @@ import {
   N8NTagResponse,
   N8NTagListResponse
 } from '../types/api';
+import { 
+  MANUAL_TRIGGER_NODE_TYPE,
+  WEBHOOK_NODE_TYPE,
+  HTTP_REQUEST_NODE_TYPE,
+  CODE_NODE_TYPE,
+  STICKY_NODE_TYPE,
+  ERROR_TRIGGER_NODE_TYPE,
+  START_NODE_TYPE,
+  EXECUTE_WORKFLOW_TRIGGER_NODE_TYPE
+} from '../types/node';
 import logger from '../utils/logger';
 import { validateWorkflowSpec, transformConnectionsToArray } from '../utils/validation';
 import { EnvironmentManager } from './environmentManager';
@@ -214,22 +224,26 @@ export async function activateWorkflow(id: string, instanceSlug?: string): Promi
     // Получаем текущий рабочий процесс, чтобы получить его полную структуру
     const workflow = await getWorkflow(id, instanceSlug);
     
-    // Улучшенная проверка наличия узла-триггера с учетом атрибута group
+    // Check for trigger nodes using official n8n node type constants
     const hasTriggerNode = workflow.nodes.some(node => {
-      // Проверка по типу узла
-      const nodeType = node.type?.toLowerCase() || '';
-      const isTypeBasedTrigger = nodeType.includes('trigger') || 
-                                nodeType.includes('webhook') || 
-                                nodeType.includes('cron') || 
-                                nodeType.includes('interval') ||
-                                nodeType.includes('schedule');
+      // Check against known trigger node types using official constants
+      const nodeType = node.type || '';
+      const isKnownTrigger = nodeType === MANUAL_TRIGGER_NODE_TYPE ||
+                            nodeType === WEBHOOK_NODE_TYPE ||
+                            nodeType === ERROR_TRIGGER_NODE_TYPE ||
+                            nodeType === START_NODE_TYPE ||
+                            nodeType === EXECUTE_WORKFLOW_TRIGGER_NODE_TYPE ||
+                            nodeType.includes('trigger') || 
+                            nodeType.includes('webhook') || 
+                            nodeType.includes('cron') || 
+                            nodeType.includes('interval') ||
+                            nodeType.includes('schedule');
       
-      // Проверка по группе (как в GoogleCalendarTrigger)
+      // Check by group attribute (for nodes like GoogleCalendarTrigger)
       const isTriggerGroup = Array.isArray(node.group) && 
                              node.group.includes('trigger');
       
-      // Узел считается триггером, если соответствует типу или имеет группу trigger
-      return isTypeBasedTrigger || isTriggerGroup;
+      return isKnownTrigger || isTriggerGroup;
     });
     
     let updatedNodes = [...workflow.nodes];
@@ -297,17 +311,18 @@ export async function activateWorkflow(id: string, instanceSlug?: string): Promi
       needsUpdate = true;
     }
     
-    // Проверяем, содержит ли процесс узел типа 'Set'
+    // Check for Set nodes - using string literal for now since no constant exists
+    const SET_NODE_TYPE = 'n8n-nodes-base.set';
     const hasSetNode = workflow.nodes.some(node => 
-      node.type === 'n8n-nodes-base.set' || 
+      node.type === SET_NODE_TYPE || 
       node.type?.includes('set')
     );
     
     // Если есть узел Set, нам нужно проверить его параметры
     if (hasSetNode) {
-      // Исправляем параметры узла 'Set' перед активацией
+      // Fix Set node parameters before activation
       updatedNodes = updatedNodes.map(node => {
-        if (node.type === 'n8n-nodes-base.set' || node.type?.includes('set')) {
+        if (node.type === SET_NODE_TYPE || node.type?.includes('set')) {
           // Убедимся, что параметры узла имеют правильную структуру
           const updatedNode = { ...node };
           

@@ -23,6 +23,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^20.0.0",
+    "n8n-workflow": "^1.82.0",
     "typescript": "^5.0.0"
   },
   "publishConfig": {

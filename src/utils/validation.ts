@@ -1,4 +1,5 @@
 import { WorkflowSpec, WorkflowInput, LegacyWorkflowConnection, ConnectionMap } from '../types/workflow';
+import { NodeConnectionType } from '../types/node';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 /**
@@ -114,14 +115,14 @@ export function validateWorkflowSpec(input: WorkflowInput): WorkflowSpec {
       
       // Make sure the array for sourceOutput exists
       const sourceOutput = conn.sourceOutput || 0;
-      while (connections[sourceNode.name].main.length <= sourceOutput) {
-        connections[sourceNode.name].main.push([]);
+      while (connections[sourceNode.name]!.main.length <= sourceOutput) {
+        connections[sourceNode.name]!.main.push([]);
       }
       
-      // Используем имя целевого узла для target
-      connections[sourceNode.name].main[sourceOutput].push({
+      // Use target node name for connection with proper type
+      connections[sourceNode.name]!.main[sourceOutput]!.push({
         node: targetNode.name,
-        type: 'main',
+        type: NodeConnectionType.Main,
         index: conn.targetInput || 0
       });
     });
@@ -131,7 +132,7 @@ export function validateWorkflowSpec(input: WorkflowInput): WorkflowSpec {
   
   // Проверка на некорректные ключи соединений
   Object.keys(connections).forEach(nodeKey => {
-    const matchingNode = formattedNodes.find(node => node.name === nodeKey);
+    const matchingNode = formattedNodes.find(node => node.name === nodeKey) || null;
     if (!matchingNode) {
       if (process.env.DEBUG === 'true') {
         console.error(`Warning: Found connection with invalid node name "${nodeKey}". Removing this connection.`);
@@ -140,8 +141,8 @@ export function validateWorkflowSpec(input: WorkflowInput): WorkflowSpec {
     }
   });
   
-  // Default settings
-  const defaultSettings = { executionOrder: 'v1' };
+  // Default settings with proper type
+  const defaultSettings: { executionOrder: 'v0' | 'v1' } = { executionOrder: 'v1' };
   const mergedSettings = input.settings 
     ? { ...defaultSettings, ...input.settings } 
     : defaultSettings;

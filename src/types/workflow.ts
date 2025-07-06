@@ -1,32 +1,24 @@
-export interface WorkflowNode {
-  id: string;
-  name: string;
-  type: string;
-  parameters: Record<string, any>;
-  position: number[];
-  typeVersion: number;
-}
+// Import official n8n types
+import type { 
+  INode, 
+  IConnections, 
+  IConnection,
+  INodeParameters,
+  IWorkflowSettings,
+  NodeConnectionType 
+} from 'n8n-workflow';
 
-export interface ConnectionItem {
-  node: string;
-  type: string;
-  index: number;
-}
-
-export interface ConnectionMap {
-  [key: string]: {
-    main: ConnectionItem[][]
-  }
-}
+// Use official n8n interfaces
+export type WorkflowNode = INode;
+export type ConnectionItem = IConnection;
+export type ConnectionMap = IConnections;
+export type WorkflowSettings = IWorkflowSettings;
 
 export interface WorkflowSpec {
   name: string;
   nodes: WorkflowNode[];
   connections: ConnectionMap;
-  settings?: {
-    executionOrder: string;
-    [key: string]: any;
-  };
+  settings?: WorkflowSettings;
   tags?: string[];
 }
 
@@ -38,18 +30,22 @@ export interface LegacyWorkflowConnection {
   targetInput?: number;
 }
 
-// Interface for input data
+// Interface for simplified input data (backward compatibility)
 export interface WorkflowInput {
   name?: string;
   nodes: {
     type: string;
     name: string;
-    parameters?: Record<string, any>;
+    parameters?: INodeParameters;
     id?: string;
-    position?: number[];
+    position?: [number, number];
+    typeVersion?: number;
+    disabled?: boolean;
+    notes?: string;
+    continueOnFail?: boolean;
   }[];
   connections: LegacyWorkflowConnection[];
   active?: boolean;
-  settings?: Record<string, any>;
+  settings?: WorkflowSettings;
   tags?: string[];
 }
