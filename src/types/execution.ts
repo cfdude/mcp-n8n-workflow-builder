@@ -81,4 +81,6 @@ export interface ExecutionListOptions {
   projectId?: string;
   limit?: number;
   cursor?: string;
+  order?: 'asc' | 'desc';
+  orderBy?: 'startedAt' | 'stoppedAt' | 'id';
 }

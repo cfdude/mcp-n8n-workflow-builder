@@ -465,7 +465,14 @@ export async function listExecutions(options: ExecutionListOptions = {}, instanc
     const api = envManager.getApiInstance(instanceSlug);
     logger.log('Listing executions');
     
-    const url = buildUrl('/executions', options, instanceSlug);
+    // Set default ordering to show most recent executions first
+    const optionsWithDefaults = {
+      order: 'desc' as const,
+      orderBy: 'startedAt' as const,
+      ...options
+    };
+    
+    const url = buildUrl('/executions', optionsWithDefaults, instanceSlug);
     
     logger.log(`Request URL: ${url}`);
     const response = await api.get(url);

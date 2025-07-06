@@ -24,6 +24,8 @@ import logger from './utils/logger';
 import { WorkflowInput, LegacyWorkflowConnection } from './types/workflow';
 import * as promptsService from './services/promptsService';
 import { Prompt } from './types/prompts';
+import * as nodeOperations from './services/nodeOperations';
+import * as executionOperations from './services/executionOperations';
 
 // Определение типа для результата вызова инструмента
 interface ToolCallResult {
@@ -473,6 +475,96 @@ class N8NWorkflowServer {
             }
           },
           
+          // Node Operation Tools
+          {
+            name: 'get_node_names',
+            enabled: true,
+            description: 'Get a list of all node names and IDs from a workflow without downloading the full workflow data',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                workflow_id: {
+                  type: 'string',
+                  description: 'The ID of the workflow to get node names from'
+                },
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name to override automatic instance selection'
+                }
+              },
+              required: ['workflow_id']
+            }
+          },
+          {
+            name: 'get_node',
+            enabled: true,
+            description: 'Get specific node(s) from a workflow without downloading the full workflow data. Supports batch operations.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                workflow_id: {
+                  type: 'string',
+                  description: 'The ID of the workflow containing the nodes'
+                },
+                node_ids: {
+                  oneOf: [
+                    { type: 'string' },
+                    { type: 'array', items: { type: 'string' } }
+                  ],
+                  description: 'Single node ID or array of node IDs to retrieve'
+                },
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name to override automatic instance selection'
+                }
+              },
+              required: ['workflow_id', 'node_ids']
+            }
+          },
+          {
+            name: 'update_node',
+            enabled: true,
+            description: 'Update specific node(s) in a workflow without modifying the rest of the workflow. Supports batch operations.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                workflow_id: {
+                  type: 'string',
+                  description: 'The ID of the workflow containing the nodes to update'
+                },
+                updates: {
+                  oneOf: [
+                    {
+                      type: 'object',
+                      properties: {
+                        nodeId: { type: 'string' },
+                        node: { type: 'object' }
+                      },
+                      required: ['nodeId', 'node']
+                    },
+                    {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          nodeId: { type: 'string' },
+                          node: { type: 'object' }
+                        },
+                        required: ['nodeId', 'node']
+                      }
+                    }
+                  ],
+                  description: 'Single node update or array of node updates. Each update contains nodeId and partial node data to merge.'
+                },
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name to override automatic instance selection'
+                }
+              },
+              required: ['workflow_id', 'updates']
+            }
+          },
+          
           // Execution Tools
           {
             name: 'list_executions',
@@ -553,6 +645,25 @@ class N8NWorkflowServer {
                 }
               },
               required: ['id']
+            }
+          },
+          {
+            name: 'get_error',
+            enabled: true,
+            description: 'Get error details for the most recent execution of a workflow',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                workflowId: { 
+                  type: 'string',
+                  description: 'The ID of the workflow to check for errors'
+                },
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name to override automatic instance selection'
+                }
+              },
+              required: ['workflowId']
             }
           },
           // Tag Tools
@@ -898,6 +1009,52 @@ class N8NWorkflowServer {
                 }]
               };
             
+            // Node Operation Tools
+            case 'get_node_names':
+              if (!args.workflow_id) {
+                throw new McpError(ErrorCode.InvalidParams, 'Workflow ID is required');
+              }
+              
+              const nodeSummaries = await nodeOperations.getNodeNames(args.workflow_id, args.instance);
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify(nodeSummaries, null, 2)
+                }]
+              };
+            
+            case 'get_node':
+              if (!args.workflow_id) {
+                throw new McpError(ErrorCode.InvalidParams, 'Workflow ID is required');
+              }
+              if (!args.node_ids) {
+                throw new McpError(ErrorCode.InvalidParams, 'Node ID(s) are required');
+              }
+              
+              const extractedNodes = await nodeOperations.getNode(args.workflow_id, args.node_ids, args.instance);
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify(extractedNodes, null, 2)
+                }]
+              };
+            
+            case 'update_node':
+              if (!args.workflow_id) {
+                throw new McpError(ErrorCode.InvalidParams, 'Workflow ID is required');
+              }
+              if (!args.updates) {
+                throw new McpError(ErrorCode.InvalidParams, 'Node updates are required');
+              }
+              
+              const updateResult = await nodeOperations.updateNode(args.workflow_id, args.updates, args.instance);
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify(updateResult, null, 2)
+                }]
+              };
+            
             // Execution Tools
             case 'list_executions':
               const executions = await this.n8nWrapper.listExecutions({
@@ -938,6 +1095,19 @@ class N8NWorkflowServer {
                 content: [{ 
                   type: 'text', 
                   text: JSON.stringify(deletedExecution, null, 2) 
+                }]
+              };
+            
+            case 'get_error':
+              if (!args.workflowId) {
+                throw new McpError(ErrorCode.InvalidParams, 'Workflow ID is required');
+              }
+              
+              const errorDetails = await executionOperations.getWorkflowError(args.workflowId, args.instance);
+              return {
+                content: [{ 
+                  type: 'text', 
+                  text: errorDetails
                 }]
               };
             

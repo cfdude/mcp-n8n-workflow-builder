@@ -13,7 +13,9 @@
       "Bash(git remote add:*)",
       "Bash(gh pr create:*)",
       "Bash(npm search:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "mcp__n8n-workflow-builder__list_executions",
+      "mcp__n8n-workflow-builder__get_execution"
     ],
     "deny": []
   }
