@@ -18,6 +18,8 @@ package-lock.json
 # Claude MCP files
 cline_mcp_settings.json
 CLAUDE.md
+.claude/
+.mcp.json
 
 # Build files
 /build
