@@ -207,6 +207,12 @@ The following tools are available through the MCP protocol:
 - **update_tag**: Updates an existing tag.
 - **delete_tag**: Deletes a tag by its ID.
 
+#### Workflow Debugging and Analysis
+- **get_error**: Retrieves error details from the most recent workflow execution. Returns structured error information including node name, error message, line numbers, and stack traces for efficient debugging.
+- **get_node_names**: Gets a list of all node names and IDs in a workflow without downloading the full workflow data. Useful for understanding workflow structure.
+- **get_node**: Retrieves specific node(s) from a workflow. Supports both single node retrieval and batch operations for multiple nodes.
+- **update_node**: Updates specific node(s) in a workflow without modifying the rest of the workflow. Supports batch updates for multiple nodes, preserving workflow integrity.
+
 ### Multi-Instance Support
 
 **New in v0.8.0**: All MCP tools now support an optional `instance` parameter to specify which n8n environment to target:
@@ -586,6 +592,12 @@ If you're using a different version of n8n, some API endpoints or node types may
 - Maintained full backward compatibility with existing .env setups
 - Updated all tool schemas and handlers for multi-instance architecture
 - **🚀 Performance optimization** - `list_workflows` now returns streamlined metadata instead of full workflow JSON, preventing large data transfers that could crash Claude Desktop
+- **🔍 New debugging tools**:
+  - `get_error`: Quickly identify and debug workflow execution errors
+  - `get_node_names`: List all nodes in a workflow for quick overview
+  - `get_node`: Extract specific nodes for detailed analysis
+  - `update_node`: Modify individual nodes without touching the rest of the workflow
+- Enhanced node operations with batch support for efficient workflow management
 - Added comprehensive testing for multi-instance functionality
 
 ### 0.7.2

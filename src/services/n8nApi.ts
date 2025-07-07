@@ -465,19 +465,53 @@ export async function listExecutions(options: ExecutionListOptions = {}, instanc
     const api = envManager.getApiInstance(instanceSlug);
     logger.log('Listing executions');
     
-    // Set default ordering to show most recent executions first
-    const optionsWithDefaults = {
-      order: 'desc' as const,
-      orderBy: 'startedAt' as const,
-      ...options
-    };
+    // Build parameters object with only valid n8n API parameters
+    const params: Record<string, any> = {};
     
-    const url = buildUrl('/executions', optionsWithDefaults, instanceSlug);
+    // Add only the parameters that n8n API actually supports
+    if (options.includeData !== undefined) {
+      params.includeData = options.includeData;
+    }
+    if (options.status) {
+      params.status = options.status;
+    }
+    if (options.workflowId) {
+      // Ensure workflowId is treated as a string, not number
+      params.workflowId = String(options.workflowId);
+    }
+    if (options.limit && options.limit > 0) {
+      params.limit = options.limit;
+    }
+    if (options.cursor) {
+      params.cursor = options.cursor;
+    }
+    // Remove projectId parameter as it may not be supported in all n8n versions
+    // if (options.projectId) {
+    //   params.projectId = options.projectId;
+    // }
+    
+    // Note: Removed order and orderBy as they may not be supported by n8n API
+    // The API likely returns executions in reverse chronological order by default
+    
+    const url = buildUrl('/executions', params, instanceSlug);
     
     logger.log(`Request URL: ${url}`);
-    const response = await api.get(url);
-    logger.log(`Retrieved ${response.data.data.length} executions`);
-    return response.data;
+    logger.log(`Request params: ${JSON.stringify(params)}`);
+    
+    try {
+      const response = await api.get(url);
+      logger.log(`Retrieved ${response.data.data.length} executions`);
+      return response.data;
+    } catch (apiError) {
+      // Enhanced error logging for debugging
+      if (axios.isAxiosError(apiError)) {
+        logger.error(`listExecutions failed with status: ${apiError.response?.status}`);
+        logger.error(`listExecutions response data: ${JSON.stringify(apiError.response?.data)}`);
+        logger.error(`listExecutions request URL: ${url}`);
+        logger.error(`listExecutions request params: ${JSON.stringify(params)}`);
+      }
+      throw apiError;
+    }
   } catch (error) {
     return handleApiError('listing executions', error);
   }

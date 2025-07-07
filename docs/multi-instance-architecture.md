@@ -137,9 +137,28 @@ instance: {
 
 // List workflows from production environment
 {
-  "name": "list_workflows", 
+  "name": "list_workflows",
   "arguments": {
     "instance": "production"
+  }
+}
+
+// Debug a workflow error in staging
+{
+  "name": "get_error",
+  "arguments": {
+    "workflowId": "abc123",
+    "instance": "staging"
+  }
+}
+
+// Update a node in development environment
+{
+  "name": "update_node",
+  "arguments": {
+    "workflow_id": "xyz789",
+    "updates": {"nodeId": "node_1", "node": {"parameters": {...}}},
+    "instance": "development"
   }
 }
 

@@ -1,64 +1,10 @@
 import { listExecutions, getExecution } from '../n8nApi';
 import { extractExecutionError, formatExecutionError, ExecutionError } from './executionExtractor';
+import { N8NApiWrapper } from '../n8nApiWrapper';
 import logger from '../../utils/logger';
 
-/**
- * Gets error details for the most recent execution of a workflow
- */
-export async function getWorkflowError(
-  workflowId: string,
-  instanceSlug?: string
-): Promise<string> {
-  try {
-    logger.log(`Getting error details for workflow ${workflowId}`);
-    
-    // Get the most recent execution for this workflow
-    const executionsList = await listExecutions({
-      workflowId,
-      limit: 1,
-      // order and orderBy defaults are already set in listExecutions
-    }, instanceSlug);
-    
-    if (!executionsList.data || executionsList.data.length === 0) {
-      return `No executions found for workflow ${workflowId}`;
-    }
-    
-    const latestExecution = executionsList.data[0];
-    logger.log(`Found latest execution ${latestExecution.id} with status: ${latestExecution.status}`);
-    
-    // If the execution was successful, return success message
-    if (latestExecution.status === 'success') {
-      return 'No errors found in the most current execution';
-    }
-    
-    // If there was an error, get detailed execution data
-    if (latestExecution.status === 'error') {
-      const detailedExecution = await getExecution(
-        latestExecution.id,
-        true, // includeData = true to get error details
-        instanceSlug
-      );
-      
-      // Extract error information
-      const errorDetails = extractExecutionError(detailedExecution);
-      
-      if (errorDetails) {
-        const formattedError = formatExecutionError(errorDetails);
-        logger.log(`Extracted error details: ${formattedError}`);
-        return formattedError;
-      } else {
-        return `Execution ${latestExecution.id} failed but no specific error details could be extracted`;
-      }
-    }
-    
-    // Handle other statuses (waiting, etc.)
-    return `Latest execution ${latestExecution.id} has status: ${latestExecution.status}`;
-    
-  } catch (error) {
-    logger.error(`Failed to get workflow error for ${workflowId}`, error);
-    throw new Error(`Failed to get workflow error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
+// Note: getWorkflowError function has been moved directly into the get_error tool implementation
+// in index.ts to follow the exact specification requirements
 
 /**
  * Gets detailed error information for a specific execution

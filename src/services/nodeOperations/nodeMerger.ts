@@ -146,21 +146,33 @@ export function validateWorkflowIntegrity(workflow: N8NWorkflowResponse): {
     return { valid: false, warnings };
   }
 
-  // Check for duplicate node IDs
+  // Check for duplicate node IDs and build name/ID maps
   const nodeIds = new Set<string>();
+  const nodeNames = new Set<string>();
+  const nodeIdByName = new Map<string, string>();
+  
   for (const node of workflow.nodes) {
     if (nodeIds.has(node.id)) {
       warnings.push(`Duplicate node ID found: ${node.id}`);
       return { valid: false, warnings };
     }
+    if (nodeNames.has(node.name)) {
+      warnings.push(`Duplicate node name found: ${node.name}`);
+      return { valid: false, warnings };
+    }
     nodeIds.add(node.id);
+    nodeNames.add(node.name);
+    nodeIdByName.set(node.name, node.id);
   }
 
   // Check that all connections reference existing nodes
+  // n8n connections can use either node names or node IDs
   if (workflow.connections) {
-    for (const [sourceId, connectionData] of Object.entries(workflow.connections)) {
-      if (!nodeIds.has(sourceId)) {
-        warnings.push(`Connection from non-existent node: ${sourceId}`);
+    for (const [sourceRef, connectionData] of Object.entries(workflow.connections)) {
+      // Check if sourceRef is a node ID or name
+      const sourceExists = nodeIds.has(sourceRef) || nodeNames.has(sourceRef);
+      if (!sourceExists) {
+        warnings.push(`Connection from non-existent node: ${sourceRef}`);
       }
 
       const typedConnectionData = connectionData as any;
@@ -168,8 +180,12 @@ export function validateWorkflowIntegrity(workflow: N8NWorkflowResponse): {
         for (const outputs of typedConnectionData.main) {
           if (Array.isArray(outputs)) {
             for (const connection of outputs) {
-              if (connection?.node && !nodeIds.has(connection.node)) {
-                warnings.push(`Connection to non-existent node: ${connection.node}`);
+              if (connection?.node) {
+                // Check if target is a node ID or name
+                const targetExists = nodeIds.has(connection.node) || nodeNames.has(connection.node);
+                if (!targetExists) {
+                  warnings.push(`Connection to non-existent node: ${connection.node}`);
+                }
               }
             }
           }

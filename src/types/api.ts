@@ -44,6 +44,7 @@ export interface N8NExecutionResponse {
   stoppedAt: string;
   workflowId: number;
   waitTill?: string | null;
+  status?: 'success' | 'error' | 'waiting' | 'running';
   customData?: {
     [key: string]: any;
   };

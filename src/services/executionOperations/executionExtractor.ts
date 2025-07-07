@@ -28,7 +28,7 @@ export function extractExecutionError(execution: N8NExecutionResponse): Executio
       return {
         nodeName: 'Execution',
         errorMessage: error.message || 'Unknown execution error',
-        errorType: error.name,
+        errorType: (error as any).name,
         stackTrace: error.stack,
         lineNumber: extractLineNumber(error.message || error.stack)
       };

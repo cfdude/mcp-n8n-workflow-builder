@@ -139,6 +139,23 @@ List all my active workflows
 Update my "Weekly Report" workflow to run on Fridays at 4 PM instead of Mondays
 ```
 
+### Debugging Workflows
+
+**Claude command**:
+```
+Check if there are any errors in my "Data Processing" workflow
+```
+
+**Claude command**:
+```
+Show me all the nodes in my "Customer Sync" workflow
+```
+
+**Claude command**:
+```
+Fix the error in the "Transform Data" node by adding better error handling
+```
+
 ### Deactivating Workflows
 
 **Claude command**:

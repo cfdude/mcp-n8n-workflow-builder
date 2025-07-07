@@ -1031,7 +1031,18 @@ class N8NWorkflowServer {
                 throw new McpError(ErrorCode.InvalidParams, 'Node ID(s) are required');
               }
               
-              const extractedNodes = await nodeOperations.getNode(args.workflow_id, args.node_ids, args.instance);
+              // Handle node_ids - could be string, array, or JSON string of array
+              let nodeIds = args.node_ids;
+              if (typeof nodeIds === 'string' && nodeIds.startsWith('[')) {
+                try {
+                  nodeIds = JSON.parse(nodeIds);
+                } catch (e) {
+                  // If parsing fails, treat as single node ID
+                  logger.warn(`Failed to parse node_ids as JSON array: ${e}`);
+                }
+              }
+              
+              const extractedNodes = await nodeOperations.getNode(args.workflow_id, nodeIds, args.instance);
               return {
                 content: [{
                   type: 'text',
@@ -1047,7 +1058,18 @@ class N8NWorkflowServer {
                 throw new McpError(ErrorCode.InvalidParams, 'Node updates are required');
               }
               
-              const updateResult = await nodeOperations.updateNode(args.workflow_id, args.updates, args.instance);
+              // Handle updates - could be object, array, or JSON string
+              let updates = args.updates;
+              if (typeof updates === 'string') {
+                try {
+                  updates = JSON.parse(updates);
+                } catch (e) {
+                  logger.error(`Failed to parse updates as JSON: ${e}`);
+                  throw new McpError(ErrorCode.InvalidParams, 'Invalid updates format - must be valid JSON');
+                }
+              }
+              
+              const updateResult = await nodeOperations.updateNode(args.workflow_id, updates, args.instance);
               return {
                 content: [{
                   type: 'text',
@@ -1103,13 +1125,103 @@ class N8NWorkflowServer {
                 throw new McpError(ErrorCode.InvalidParams, 'Workflow ID is required');
               }
               
-              const errorDetails = await executionOperations.getWorkflowError(args.workflowId, args.instance);
-              return {
-                content: [{ 
-                  type: 'text', 
-                  text: errorDetails
-                }]
-              };
+              try {
+                // Step 1: Get the most recent execution for this workflow
+                // Copy the exact pattern from list_executions
+                const listExecutionsParams = {
+                  includeData: false,
+                  status: args.status, // undefined by default
+                  workflowId: args.workflowId,
+                  projectId: args.projectId, // undefined by default
+                  limit: 1,
+                  cursor: args.cursor // undefined by default
+                };
+                
+                const executions = await this.n8nWrapper.listExecutions(listExecutionsParams, args.instance);
+                
+                // Check if we have any executions
+                if (!executions.data || executions.data.length === 0) {
+                  const response = {
+                    status: 'no_executions',
+                    workflowId: args.workflowId,
+                    message: `No executions found for workflow ${args.workflowId}`
+                  };
+                  return {
+                    content: [{ 
+                      type: 'text', 
+                      text: JSON.stringify(response, null, 2)
+                    }]
+                  };
+                }
+                
+                const mostRecentExecution = executions.data[0];
+                
+                // Step 2: Check if the most recent execution has an error
+                const hasError = !mostRecentExecution.finished || mostRecentExecution.status === 'error';
+                
+                if (!hasError) {
+                  // Step 3: Handle success case - no error found
+                  const response = {
+                    status: 'success',
+                    workflowId: args.workflowId,
+                    executionId: mostRecentExecution.id,
+                    message: `No errors found in the most current execution for workflow ${args.workflowId}`
+                  };
+                  return {
+                    content: [{ 
+                      type: 'text', 
+                      text: JSON.stringify(response, null, 2)
+                    }]
+                  };
+                }
+                
+                // Step 4: Process error case - get detailed execution data
+                const detailedExecution = await this.n8nWrapper.getExecution(
+                  Number(mostRecentExecution.id),
+                  true, // includeData = true to get full execution details
+                  args.instance
+                );
+                
+                // Step 5: Extract structured error information
+                const errorInfo = executionOperations.extractExecutionError(detailedExecution);
+                
+                if (errorInfo) {
+                  const response = {
+                    status: 'error',
+                    workflowId: args.workflowId,
+                    executionId: mostRecentExecution.id,
+                    error: {
+                      nodeName: errorInfo.nodeName,
+                      nodeId: errorInfo.nodeId,
+                      errorMessage: errorInfo.errorMessage,
+                      errorType: errorInfo.errorType,
+                      lineNumber: errorInfo.lineNumber,
+                      stackTrace: errorInfo.stackTrace
+                    }
+                  };
+                  return {
+                    content: [{ 
+                      type: 'text', 
+                      text: JSON.stringify(response, null, 2)
+                    }]
+                  };
+                } else {
+                  const response = {
+                    status: 'error_extraction_failed',
+                    workflowId: args.workflowId,
+                    executionId: mostRecentExecution.id,
+                    message: `Execution ${mostRecentExecution.id} failed but no specific error details could be extracted`
+                  };
+                  return {
+                    content: [{ 
+                      type: 'text', 
+                      text: JSON.stringify(response, null, 2)
+                    }]
+                  };
+                }
+              } catch (error) {
+                throw new McpError(ErrorCode.InternalError, `Failed to get workflow error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              }
             
             // Tag Tools
             case 'create_tag':
