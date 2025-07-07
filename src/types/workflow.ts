@@ -4,8 +4,10 @@ import type {
   IConnections, 
   IConnection,
   INodeParameters,
+  INodeCredentials,
   IWorkflowSettings,
-  NodeConnectionType 
+  NodeConnectionType,
+  OnError 
 } from 'n8n-workflow';
 
 // Use official n8n interfaces
@@ -42,7 +44,17 @@ export interface WorkflowInput {
     typeVersion?: number;
     disabled?: boolean;
     notes?: string;
+    notesInFlow?: boolean;
+    retryOnFail?: boolean;
+    maxTries?: number;
+    waitBetweenTries?: number;
+    alwaysOutputData?: boolean;
+    executeOnce?: boolean;
+    onError?: OnError;
     continueOnFail?: boolean;
+    credentials?: INodeCredentials;
+    webhookId?: string;
+    extendsCredential?: string;
   }[];
   connections: LegacyWorkflowConnection[];
   active?: boolean;

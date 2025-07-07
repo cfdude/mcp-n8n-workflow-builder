@@ -75,14 +75,57 @@ export function validateWorkflowSpec(input: WorkflowInput): WorkflowSpec {
     }
     
     // Create a properly formatted node
-    return {
+    const formattedNode: any = {
       id: nodeId,
       name: node.name,
       type: node.type,
       parameters: node.parameters || {},
       position: node.position || [index * 200, 300], // Position nodes horizontally with a step of 200
-      typeVersion: 1
+      typeVersion: node.typeVersion || 1
     };
+    
+    // Include all optional fields if they exist
+    if (node.credentials) {
+      formattedNode.credentials = node.credentials;
+    }
+    if (node.disabled !== undefined) {
+      formattedNode.disabled = node.disabled;
+    }
+    if (node.notes) {
+      formattedNode.notes = node.notes;
+    }
+    if (node.notesInFlow !== undefined) {
+      formattedNode.notesInFlow = node.notesInFlow;
+    }
+    if (node.retryOnFail !== undefined) {
+      formattedNode.retryOnFail = node.retryOnFail;
+    }
+    if (node.maxTries !== undefined) {
+      formattedNode.maxTries = node.maxTries;
+    }
+    if (node.waitBetweenTries !== undefined) {
+      formattedNode.waitBetweenTries = node.waitBetweenTries;
+    }
+    if (node.alwaysOutputData !== undefined) {
+      formattedNode.alwaysOutputData = node.alwaysOutputData;
+    }
+    if (node.executeOnce !== undefined) {
+      formattedNode.executeOnce = node.executeOnce;
+    }
+    if (node.onError !== undefined) {
+      formattedNode.onError = node.onError;
+    }
+    if (node.continueOnFail !== undefined) {
+      formattedNode.continueOnFail = node.continueOnFail;
+    }
+    if (node.webhookId) {
+      formattedNode.webhookId = node.webhookId;
+    }
+    if (node.extendsCredential) {
+      formattedNode.extendsCredential = node.extendsCredential;
+    }
+    
+    return formattedNode;
   });
   
   // Create a dictionary of nodes by ID for quick access
