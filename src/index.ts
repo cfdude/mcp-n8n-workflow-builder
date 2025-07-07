@@ -658,6 +658,18 @@ class N8NWorkflowServer {
                   type: 'string',
                   description: 'The ID of the workflow to check for errors'
                 },
+                includeData: {
+                  type: 'boolean',
+                  default: false,
+                  description: 'Whether to include execution data from nodes preceding the error'
+                },
+                dataDepth: {
+                  type: 'number',
+                  default: 1,
+                  minimum: 1,
+                  maximum: 10,
+                  description: 'Number of preceding nodes to include data from (max 10)'
+                },
                 instance: {
                   type: 'string',
                   description: 'Optional instance name to override automatic instance selection'
@@ -1178,7 +1190,7 @@ class N8NWorkflowServer {
                 // Step 4: Process error case - get detailed execution data
                 const detailedExecution = await this.n8nWrapper.getExecution(
                   Number(mostRecentExecution.id),
-                  true, // includeData = true to get full execution details
+                  true, // Always get data internally to process errors
                   args.instance
                 );
                 
@@ -1186,6 +1198,17 @@ class N8NWorkflowServer {
                 const errorInfo = executionOperations.extractExecutionError(detailedExecution);
                 
                 if (errorInfo) {
+                  // Step 6: Extract node execution data if requested
+                  let nodeDataContext = undefined;
+                  if (args.includeData) {
+                    const dataDepth = Math.min(Math.max(args.dataDepth || 1, 1), 10);
+                    nodeDataContext = executionOperations.extractNodeDataContext(
+                      detailedExecution,
+                      errorInfo.nodeName,
+                      dataDepth
+                    );
+                  }
+                  
                   const response = {
                     status: 'error',
                     workflowId: args.workflowId,
@@ -1197,7 +1220,8 @@ class N8NWorkflowServer {
                       errorType: errorInfo.errorType,
                       lineNumber: errorInfo.lineNumber,
                       stackTrace: errorInfo.stackTrace
-                    }
+                    },
+                    ...(nodeDataContext && { nodeDataContext })
                   };
                   return {
                     content: [{ 

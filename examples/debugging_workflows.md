@@ -7,6 +7,8 @@ This guide demonstrates how to use the new debugging and analysis tools to effic
 The n8n MCP server provides several powerful tools for debugging and analyzing workflows:
 
 - **get_error**: Quickly identify errors in workflow executions
+  - Optional: `includeData` (boolean) - Include execution data from nodes preceding the error
+  - Optional: `dataDepth` (number, 1-10) - Number of preceding nodes to include data from
 - **get_node_names**: Get an overview of all nodes in a workflow
 - **get_node**: Extract specific nodes for detailed analysis
 - **update_node**: Modify individual nodes without affecting the rest of the workflow
@@ -36,6 +38,57 @@ Check if there are any errors in my "Data Processing Pipeline" workflow
   }
 }
 ```
+
+**Enhanced debugging with data context**:
+```
+Check for errors in my "Data Processing Pipeline" workflow and show me what data was flowing into the error node
+```
+
+**Example response with includeData=true and dataDepth=2**:
+```json
+{
+  "status": "error",
+  "workflowId": "abc123",
+  "executionId": "456",
+  "error": {
+    "nodeName": "Transform Data",
+    "errorMessage": "Cannot read property 'id' of undefined [line 5]",
+    "lineNumber": 5,
+    "stackTrace": "..."
+  },
+  "nodeDataContext": {
+    "errorNode": "Transform Data",
+    "dataDepth": 2,
+    "nodeExecutionOrder": ["Schedule Trigger", "Fetch Data", "Parse JSON", "Transform Data"],
+    "nodeData": [
+      {
+        "nodeName": "Fetch Data",
+        "position": 2,
+        "distanceFromError": 2,
+        "runData": {
+          "executionStatus": "success",
+          "data": {
+            "main": [[{ "json": { "response": "OK", "items": [] } }]]
+          }
+        }
+      },
+      {
+        "nodeName": "Parse JSON",
+        "position": 3,
+        "distanceFromError": 1,
+        "runData": {
+          "executionStatus": "success",
+          "data": {
+            "main": [[]]
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+This shows that the error occurred because "Parse JSON" returned an empty array, causing "Transform Data" to fail when trying to access the 'id' property.
 
 ### 2. Understanding Workflow Structure
 

@@ -209,6 +209,8 @@ The following tools are available through the MCP protocol:
 
 #### Workflow Debugging and Analysis
 - **get_error**: Retrieves error details from the most recent workflow execution. Returns structured error information including node name, error message, line numbers, and stack traces for efficient debugging.
+  - Optional: `includeData` (boolean, default: false) - Include execution data from nodes preceding the error
+  - Optional: `dataDepth` (number, default: 1, max: 10) - Number of preceding nodes to include data from
 - **get_node_names**: Gets a list of all node names and IDs in a workflow without downloading the full workflow data. Useful for understanding workflow structure.
 - **get_node**: Retrieves specific node(s) from a workflow. Supports both single node retrieval and batch operations for multiple nodes.
 - **update_node**: Updates specific node(s) in a workflow without modifying the rest of the workflow. Supports batch updates for multiple nodes, preserving workflow integrity.
