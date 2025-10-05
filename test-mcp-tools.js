@@ -24,6 +24,7 @@ const testFlags = {
   runWorkflowTests: true,
   runTagTests: true,
   runExecutionTests: true,
+  runCredentialTests: true,
   runCleanup: true // Флаг для отключения очистки (полезно для отладки)
 };
 
@@ -32,6 +33,7 @@ const testData = {
   workflowId: null,
   tagId: null,
   executionId: null,
+  credentialId: null,
   workflowActivated: false,
   testResults: {
     passed: 0,
@@ -564,6 +566,90 @@ async function runWorkflowTests() {
 }
 
 /**
+ * Тесты для инструментов управления учетными данными
+ */
+async function runCredentialTests() {
+  logger.section('Credential Tools Tests');
+
+  try {
+    // 1. Создание учетных данных
+    const testCredentialData = {
+      name: 'Test HTTP Basic Auth Credential',
+      type: 'httpBasicAuth',
+      data: {
+        user: 'testuser',
+        password: 'testpassword123'
+      }
+    };
+
+    logger.info(`Creating test credential: ${testCredentialData.name}`);
+    const createResult = await callTool('create_credential', testCredentialData);
+
+    const createdCredential = JSON.parse(createResult.content[0].text);
+    testData.credentialId = createdCredential.id;
+
+    logger.test('create_credential', !!testData.credentialId);
+    logger.info(`Created credential with ID: ${testData.credentialId}`);
+
+    // Пауза после создания
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // 2. Получение списка учетных данных
+    logger.info('Getting all credentials');
+    const listResult = await callTool('list_credentials', {});
+    const credentialsList = JSON.parse(listResult.content[0].text);
+    logger.test('list_credentials', credentialsList.data && credentialsList.data.length > 0);
+
+    // 3. Получение учетных данных по ID
+    if (testData.credentialId) {
+      logger.info(`Getting credential by ID: ${testData.credentialId}`);
+      const getResult = await callTool('get_credential', { id: testData.credentialId });
+      const retrievedCredential = JSON.parse(getResult.content[0].text);
+      logger.test('get_credential', retrievedCredential.id === testData.credentialId);
+    }
+
+    // 4. Обновление учетных данных
+    if (testData.credentialId) {
+      const updatedName = 'Updated Test Credential';
+      logger.info(`Updating credential name to: ${updatedName}`);
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const updateResult = await callTool('update_credential', {
+        id: testData.credentialId,
+        name: updatedName
+      });
+
+      const updatedCredential = JSON.parse(updateResult.content[0].text);
+      logger.test('update_credential', updatedCredential.name === updatedName);
+    }
+
+    // 5. Тестирование пагинации
+    logger.info('Testing credentials pagination');
+    const paginatedResult = await callTool('list_credentials', { limit: 1 });
+    const paginatedList = JSON.parse(paginatedResult.content[0].text);
+    logger.test('list_credentials_pagination', paginatedList.data && paginatedList.data.length <= 1);
+
+    // 6. Получение схемы учетных данных
+    logger.info('Getting credential schema for httpBasicAuth');
+    try {
+      const schemaResult = await callTool('get_credential_schema', {
+        credentialType: 'httpBasicAuth'
+      });
+      const schema = JSON.parse(schemaResult.content[0].text);
+      logger.test('get_credential_schema', schema && schema.type === 'httpBasicAuth');
+    } catch (error) {
+      logger.warn('get_credential_schema test failed (may not be supported by n8n version)');
+      logger.test('get_credential_schema', false);
+    }
+
+  } catch (error) {
+    logger.error('Credential tests failed', error);
+    throw error;
+  }
+}
+
+/**
  * Тесты для инструментов управления выполнениями workflow
  */
 async function runExecutionTests() {
@@ -711,6 +797,17 @@ async function cleanup() {
       logger.error(`Failed to delete tag: ${testData.tagId}`, error);
     }
   }
+
+  // Удаление тестовых учетных данных
+  if (testData.credentialId) {
+    try {
+      logger.info(`Deleting test credential: ${testData.credentialId}`);
+      const deleteCredentialResult = await callTool('delete_credential', { id: testData.credentialId });
+      logger.test('delete_credential', !!deleteCredentialResult);
+    } catch (error) {
+      logger.error(`Failed to delete credential: ${testData.credentialId}`, error);
+    }
+  }
 }
 
 /**
@@ -736,16 +833,20 @@ async function runTests() {
     if (testFlags.runWorkflowTests) {
       await runWorkflowTests();
     }
-    
+
     if (testFlags.runTagTests) {
       await runTagTests();
     }
-    
+
+    if (testFlags.runCredentialTests) {
+      await runCredentialTests();
+    }
+
     // 2. Затем выполняем рабочие процессы и тестируем выполнения
     if (testFlags.runExecutionTests) {
       await runExecutionTests();
     }
-    
+
     // 3. В конце очищаем все созданные данные
     await cleanup();
     

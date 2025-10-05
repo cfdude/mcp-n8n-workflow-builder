@@ -27,6 +27,7 @@ import { Prompt } from './types/prompts';
 import * as nodeOperations from './services/nodeOperations';
 import * as executionOperations from './services/executionOperations';
 import { handleListInstances } from './tools/list-instances';
+import { CredentialOperations } from './services/credentialOperations';
 
 // Определение типа для результата вызова инструмента
 interface ToolCallResult {
@@ -44,10 +45,12 @@ class N8NWorkflowServer {
   private server: InstanceType<typeof Server>;
   private isDebugMode: boolean;
   private n8nWrapper: N8NApiWrapper;
+  private credentialOps: CredentialOperations;
 
   constructor() {
     this.isDebugMode = process.env.DEBUG === 'true';
     this.n8nWrapper = new N8NApiWrapper();
+    this.credentialOps = new CredentialOperations();
     
     this.server = new Server(
       { name: 'n8n-workflow-builder', version: '0.3.0' },
@@ -786,6 +789,162 @@ class N8NWorkflowServer {
               required: ['id']
             }
           },
+
+          // Credential Tools
+          {
+            name: 'list_credentials',
+            enabled: true,
+            description: 'List all credentials with pagination support',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of credentials to return'
+                },
+                cursor: {
+                  type: 'string',
+                  description: 'Cursor for pagination'
+                },
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name to override automatic instance selection'
+                }
+              }
+            }
+          },
+          {
+            name: 'get_credential',
+            enabled: true,
+            description: 'Get a specific credential by ID',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'string',
+                  description: 'The ID of the credential to retrieve'
+                },
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name to override automatic instance selection'
+                }
+              },
+              required: ['id']
+            }
+          },
+          {
+            name: 'create_credential',
+            enabled: true,
+            description: 'Create a new credential',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                name: {
+                  type: 'string',
+                  description: 'The name of the credential'
+                },
+                type: {
+                  type: 'string',
+                  description: 'The credential type (e.g., "airtableApi", "googleSheetsOAuth2Api")'
+                },
+                data: {
+                  type: 'object',
+                  description: 'The credential data (e.g., {"apiKey": "your-key"})'
+                },
+                nodesAccess: {
+                  type: 'array',
+                  description: 'Optional array of nodes that can access this credential',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      nodeType: {
+                        type: 'string',
+                        description: 'Node type (e.g., "n8n-nodes-base.airtable")'
+                      }
+                    }
+                  }
+                },
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name to override automatic instance selection'
+                }
+              },
+              required: ['name', 'type', 'data']
+            }
+          },
+          {
+            name: 'update_credential',
+            enabled: true,
+            description: 'Update an existing credential',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'string',
+                  description: 'The ID of the credential to update'
+                },
+                name: {
+                  type: 'string',
+                  description: 'The new name for the credential'
+                },
+                type: {
+                  type: 'string',
+                  description: 'The credential type'
+                },
+                data: {
+                  type: 'object',
+                  description: 'The updated credential data'
+                },
+                nodesAccess: {
+                  type: 'array',
+                  description: 'Updated array of nodes that can access this credential'
+                },
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name to override automatic instance selection'
+                }
+              },
+              required: ['id']
+            }
+          },
+          {
+            name: 'delete_credential',
+            enabled: true,
+            description: 'Delete a credential by ID',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'string',
+                  description: 'The ID of the credential to delete'
+                },
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name to override automatic instance selection'
+                }
+              },
+              required: ['id']
+            }
+          },
+          {
+            name: 'get_credential_schema',
+            enabled: true,
+            description: 'Get the schema for a specific credential type',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                credentialType: {
+                  type: 'string',
+                  description: 'The credential type name (e.g., "airtableApi", "githubOAuth2Api")'
+                },
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name to override automatic instance selection'
+                }
+              },
+              required: ['credentialType']
+            }
+          },
           {
             name: 'list_instances',
             enabled: true,
@@ -1338,6 +1497,102 @@ class N8NWorkflowServer {
                 content: [{ 
                   type: 'text', 
                   text: JSON.stringify(deletedTag, null, 2) 
+                }]
+              };
+
+            // Credential Tools
+            case 'list_credentials':
+              const credentialsOptions: { limit?: number; cursor?: string } = {};
+              
+              if (args.limit) {
+                credentialsOptions.limit = args.limit;
+              }
+              
+              if (args.cursor) {
+                credentialsOptions.cursor = args.cursor;
+              }
+              
+              const credentials = await this.credentialOps.listCredentials(credentialsOptions, args.instance);
+              return {
+                content: [{ 
+                  type: 'text', 
+                  text: JSON.stringify(credentials, null, 2) 
+                }]
+              };
+            
+            case 'get_credential':
+              if (!args.id) {
+                throw new McpError(ErrorCode.InvalidParams, 'Credential ID is required');
+              }
+              
+              const credential = await this.credentialOps.getCredential(args.id, args.instance);
+              return {
+                content: [{ 
+                  type: 'text', 
+                  text: JSON.stringify(credential, null, 2) 
+                }]
+              };
+            
+            case 'create_credential':
+              if (!args.name || !args.type || !args.data) {
+                throw new McpError(ErrorCode.InvalidParams, 'Credential name, type, and data are required');
+              }
+              
+              const newCredential = await this.credentialOps.createCredential({
+                name: args.name,
+                type: args.type,
+                data: args.data,
+                nodesAccess: args.nodesAccess
+              }, args.instance);
+              return {
+                content: [{ 
+                  type: 'text', 
+                  text: JSON.stringify(newCredential, null, 2) 
+                }]
+              };
+            
+            case 'update_credential':
+              if (!args.id) {
+                throw new McpError(ErrorCode.InvalidParams, 'Credential ID is required');
+              }
+              
+              const credentialUpdate: any = {};
+              if (args.name) credentialUpdate.name = args.name;
+              if (args.type) credentialUpdate.type = args.type;
+              if (args.data) credentialUpdate.data = args.data;
+              if (args.nodesAccess) credentialUpdate.nodesAccess = args.nodesAccess;
+              
+              const updatedCredential = await this.credentialOps.updateCredential(args.id, credentialUpdate, args.instance);
+              return {
+                content: [{ 
+                  type: 'text', 
+                  text: JSON.stringify(updatedCredential, null, 2) 
+                }]
+              };
+            
+            case 'delete_credential':
+              if (!args.id) {
+                throw new McpError(ErrorCode.InvalidParams, 'Credential ID is required');
+              }
+              
+              const deletedCredential = await this.credentialOps.deleteCredential(args.id, args.instance);
+              return {
+                content: [{ 
+                  type: 'text', 
+                  text: JSON.stringify(deletedCredential, null, 2) 
+                }]
+              };
+            
+            case 'get_credential_schema':
+              if (!args.credentialType) {
+                throw new McpError(ErrorCode.InvalidParams, 'Credential type is required');
+              }
+              
+              const credentialSchema = await this.credentialOps.getCredentialSchema(args.credentialType, args.instance);
+              return {
+                content: [{ 
+                  type: 'text', 
+                  text: JSON.stringify(credentialSchema, null, 2) 
                 }]
               };
 

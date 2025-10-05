@@ -97,3 +97,43 @@ export interface N8NTagListResponse {
   data: N8NTagResponse[];
   nextCursor?: string;
 }
+
+/**
+ * Credential interface for n8n API v1
+ */
+export interface N8NCredential {
+  id?: string;
+  name: string;
+  type: string;
+  data: Record<string, any>;
+  nodesAccess?: Array<{
+    nodeType: string;
+    date?: string;
+  }>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Credential schema interface
+ */
+export interface N8NCredentialSchema {
+  type: string;
+  displayName: string;
+  properties: Array<{
+    displayName: string;
+    name: string;
+    type: string;
+    default?: any;
+    required?: boolean;
+    description?: string;
+  }>;
+}
+
+/**
+ * Response structure when listing credentials
+ */
+export interface N8NCredentialsListResponse {
+  data: N8NCredential[];
+  nextCursor?: string;
+}

@@ -8,7 +8,10 @@ import {
   N8NExecutionResponse, 
   N8NExecutionListResponse,
   N8NTagResponse,
-  N8NTagListResponse
+  N8NTagListResponse,
+  N8NCredential,
+  N8NCredentialSchema,
+  N8NCredentialsListResponse
 } from '../types/api';
 import { EnhancedMultiInstanceConfig } from '../types/config';
 import { ConfigLoader } from '../config/configLoader';
@@ -332,6 +335,101 @@ export class N8NApiWrapper {
         return response.data;
       } catch (error) {
         return this.handleApiError(`deleting tag with ID ${id}`, error);
+      }
+    });
+  }
+
+  // Credential management methods
+  async listCredentials(options: { limit?: number; cursor?: string } = {}, instanceSlug?: string): Promise<N8NCredentialsListResponse> {
+    return this.callWithInstance(instanceSlug, async () => {
+      const api = this.envManager.getApiInstance(instanceSlug);
+      
+      try {
+        logger.log('Listing credentials');
+        const response = await api.get('/credentials', { params: options });
+        logger.log(`Retrieved ${response.data.data?.length || 0} credentials`);
+        
+        return {
+          data: response.data.data || response.data,
+          nextCursor: response.data.nextCursor
+        };
+      } catch (error) {
+        return this.handleApiError('listing credentials', error);
+      }
+    });
+  }
+
+  async getCredential(id: string, instanceSlug?: string): Promise<N8NCredential> {
+    return this.callWithInstance(instanceSlug, async () => {
+      const api = this.envManager.getApiInstance(instanceSlug);
+      
+      try {
+        logger.log(`Getting credential with ID: ${id}`);
+        const response = await api.get(`/credentials/${id}`);
+        logger.log(`Retrieved credential: ${response.data.name}`);
+        return response.data;
+      } catch (error) {
+        return this.handleApiError(`getting credential with ID ${id}`, error);
+      }
+    });
+  }
+
+  async createCredential(credential: Omit<N8NCredential, 'id' | 'createdAt' | 'updatedAt'>, instanceSlug?: string): Promise<N8NCredential> {
+    return this.callWithInstance(instanceSlug, async () => {
+      const api = this.envManager.getApiInstance(instanceSlug);
+      
+      try {
+        logger.log(`Creating credential: ${credential.name}`);
+        const response = await api.post('/credentials', credential);
+        logger.log(`Created credential with ID: ${response.data.id}`);
+        return response.data;
+      } catch (error) {
+        return this.handleApiError(`creating credential ${credential.name}`, error);
+      }
+    });
+  }
+
+  async updateCredential(id: string, credential: Partial<Omit<N8NCredential, 'id' | 'createdAt' | 'updatedAt'>>, instanceSlug?: string): Promise<N8NCredential> {
+    return this.callWithInstance(instanceSlug, async () => {
+      const api = this.envManager.getApiInstance(instanceSlug);
+      
+      try {
+        logger.log(`Updating credential with ID: ${id}`);
+        const response = await api.put(`/credentials/${id}`, credential);
+        logger.log(`Updated credential: ${response.data.name}`);
+        return response.data;
+      } catch (error) {
+        return this.handleApiError(`updating credential with ID ${id}`, error);
+      }
+    });
+  }
+
+  async deleteCredential(id: string, instanceSlug?: string): Promise<{ success: boolean }> {
+    return this.callWithInstance(instanceSlug, async () => {
+      const api = this.envManager.getApiInstance(instanceSlug);
+      
+      try {
+        logger.log(`Deleting credential with ID: ${id}`);
+        await api.delete(`/credentials/${id}`);
+        logger.log(`Deleted credential: ${id}`);
+        return { success: true };
+      } catch (error) {
+        return this.handleApiError(`deleting credential with ID ${id}`, error);
+      }
+    });
+  }
+
+  async getCredentialSchema(credentialType: string, instanceSlug?: string): Promise<N8NCredentialSchema> {
+    return this.callWithInstance(instanceSlug, async () => {
+      const api = this.envManager.getApiInstance(instanceSlug);
+      
+      try {
+        logger.log(`Getting credential schema for type: ${credentialType}`);
+        const response = await api.get(`/credentials/schema/${credentialType}`);
+        logger.log(`Retrieved schema for: ${credentialType}`);
+        return response.data;
+      } catch (error) {
+        return this.handleApiError(`getting credential schema for ${credentialType}`, error);
       }
     });
   }
