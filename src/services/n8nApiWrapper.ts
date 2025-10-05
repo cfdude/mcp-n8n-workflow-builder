@@ -10,6 +10,8 @@ import {
   N8NTagResponse,
   N8NTagListResponse
 } from '../types/api';
+import { EnhancedMultiInstanceConfig } from '../types/config';
+import { ConfigLoader } from '../config/configLoader';
 import logger from '../utils/logger';
 import { validateWorkflowSpec, transformConnectionsToArray } from '../utils/validation';
 
@@ -155,13 +157,13 @@ export class N8NApiWrapper {
     });
   }
 
-  async listWorkflows(instanceSlug?: string): Promise<N8NWorkflowSummary[]> {
+  async listWorkflows(options: { limit?: number; cursor?: string } = {}, instanceSlug?: string): Promise<{ data: N8NWorkflowSummary[]; nextCursor?: string }> {
     return this.callWithInstance(instanceSlug, async () => {
       const api = this.envManager.getApiInstance(instanceSlug);
       
       try {
         logger.log('Listing workflows');
-        const response = await api.get('/workflows');
+        const response = await api.get('/workflows', { params: options });
         logger.log(`Retrieved ${response.data.data ? response.data.data.length : 0} workflows`);
         
         // Extract workflows from nested response structure
@@ -185,7 +187,10 @@ export class N8NApiWrapper {
             // Note: folder information may not be available in list view
           }));
         
-        return workflowSummaries;
+        return {
+          data: workflowSummaries,
+          nextCursor: response.data.nextCursor
+        };
       } catch (error) {
         return this.handleApiError('listing workflows', error);
       }
@@ -338,5 +343,21 @@ export class N8NApiWrapper {
 
   getDefaultInstance(): string {
     return this.envManager.getDefaultEnvironment();
+  }
+
+  // Enhanced configuration methods
+  async getEnhancedConfig(): Promise<EnhancedMultiInstanceConfig> {
+    const configLoader = ConfigLoader.getInstance();
+    return configLoader.loadEnhancedConfig();
+  }
+
+  async getEnhancedAvailableInstances(): Promise<string[]> {
+    const configLoader = ConfigLoader.getInstance();
+    return configLoader.getAvailableInstances();
+  }
+
+  async getEnhancedDefaultInstance(): Promise<string> {
+    const configLoader = ConfigLoader.getInstance();
+    return configLoader.getDefaultInstance();
   }
 }

@@ -1,11 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import { Config, MultiInstanceConfig, N8NInstance } from '../types/config';
+import { Config, MultiInstanceConfig, EnhancedMultiInstanceConfig, N8NInstance } from '../types/config';
 
 export class ConfigLoader {
   private static instance: ConfigLoader;
   private config: MultiInstanceConfig | null = null;
+  private enhancedConfig: EnhancedMultiInstanceConfig | null = null;
 
   private constructor() {}
 
@@ -174,5 +175,133 @@ export class ConfigLoader {
   public getDefaultEnvironment(): string {
     const config = this.loadConfig();
     return config.defaultEnv;
+  }
+
+  /**
+   * Load enhanced configuration that supports both legacy and new formats
+   */
+  public loadEnhancedConfig(): EnhancedMultiInstanceConfig {
+    if (this.enhancedConfig) {
+      return this.enhancedConfig;
+    }
+
+    // Use stderr for debug logging to avoid interfering with MCP JSON-RPC protocol
+    if (process.env.DEBUG === 'true') {
+      console.error(`[ConfigLoader] Loading enhanced configuration`);
+    }
+
+    // Try to load .config.json first
+    const configPaths = [
+      path.join(process.cwd(), '.config.json'),
+      path.join(__dirname, '../../.config.json'), // Relative to build/config/configLoader.js
+      path.join(__dirname, '../../../.config.json') // In case of different build structure
+    ];
+    
+    for (const configJsonPath of configPaths) {
+      if (process.env.DEBUG === 'true') {
+        console.error(`[ConfigLoader] Checking for enhanced config at: ${configJsonPath}`);
+      }
+      if (fs.existsSync(configJsonPath)) {
+        if (process.env.DEBUG === 'true') {
+          console.error(`[ConfigLoader] Loading enhanced config from: ${configJsonPath}`);
+        }
+        this.enhancedConfig = this.loadEnhancedFromJson(configJsonPath);
+        return this.enhancedConfig;
+      }
+    }
+
+    // Fallback to legacy configuration and convert it
+    if (process.env.DEBUG === 'true') {
+      console.error(`[ConfigLoader] No enhanced config found, converting from legacy format`);
+    }
+    
+    const legacyConfig = this.loadConfig();
+    this.enhancedConfig = this.convertLegacyToEnhanced(legacyConfig);
+    return this.enhancedConfig;
+  }
+
+  /**
+   * Load enhanced configuration from JSON file
+   */
+  private loadEnhancedFromJson(configPath: string): EnhancedMultiInstanceConfig {
+    try {
+      const configData = fs.readFileSync(configPath, 'utf8');
+      const parsedConfig: Config = JSON.parse(configData);
+
+      // Check if this is the new enhanced format
+      if (parsedConfig.instances && parsedConfig.defaultInstance) {
+        // Enhanced multi-instance configuration
+        if (!parsedConfig.instances[parsedConfig.defaultInstance]) {
+          throw new Error(`Default instance '${parsedConfig.defaultInstance}' not found in instances`);
+        }
+
+        // Validate all instances have required fields
+        for (const [instanceName, instanceConfig] of Object.entries(parsedConfig.instances)) {
+          if (!instanceConfig.n8n_host || !instanceConfig.n8n_api_key) {
+            throw new Error(`Instance '${instanceName}' is missing required fields (n8n_host, n8n_api_key)`);
+          }
+        }
+
+        return {
+          instances: parsedConfig.instances,
+          defaultInstance: parsedConfig.defaultInstance,
+          workflows: parsedConfig.workflows
+        };
+      } else {
+        // Legacy format - convert using the standard loader and then enhance
+        const legacyConfig = this.loadFromJson(configPath);
+        return this.convertLegacyToEnhanced(legacyConfig);
+      }
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`Invalid JSON format in .config.json: ${error.message}`);
+      }
+      throw new Error(`Enhanced configuration error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Convert legacy configuration to enhanced format
+   */
+  private convertLegacyToEnhanced(legacyConfig: MultiInstanceConfig): EnhancedMultiInstanceConfig {
+    if (process.env.DEBUG === 'true') {
+      console.error(`[ConfigLoader] Converting legacy config with ${Object.keys(legacyConfig.environments).length} environments`);
+    }
+
+    return {
+      instances: legacyConfig.environments,
+      defaultInstance: legacyConfig.defaultEnv,
+      workflows: undefined // No workflow mappings in legacy format
+    };
+  }
+
+  /**
+   * Get enhanced configuration for a specific instance
+   */
+  public getEnhancedInstanceConfig(instanceName?: string): N8NInstance {
+    const config = this.loadEnhancedConfig();
+    const targetInstance = instanceName || config.defaultInstance;
+
+    if (!config.instances[targetInstance]) {
+      throw new Error(`Instance '${targetInstance}' not found. Available instances: ${Object.keys(config.instances).join(', ')}`);
+    }
+
+    return config.instances[targetInstance];
+  }
+
+  /**
+   * Get list of available instances (enhanced)
+   */
+  public getAvailableInstances(): string[] {
+    const config = this.loadEnhancedConfig();
+    return Object.keys(config.instances);
+  }
+
+  /**
+   * Get default instance name (enhanced)
+   */
+  public getDefaultInstance(): string {
+    const config = this.loadEnhancedConfig();
+    return config.defaultInstance;
   }
 }

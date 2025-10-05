@@ -26,6 +26,7 @@ import * as promptsService from './services/promptsService';
 import { Prompt } from './types/prompts';
 import * as nodeOperations from './services/nodeOperations';
 import * as executionOperations from './services/executionOperations';
+import { handleListInstances } from './tools/list-instances';
 
 // Определение типа для результата вызова инструмента
 interface ToolCallResult {
@@ -260,13 +261,17 @@ class N8NWorkflowServer {
           {
             name: 'list_workflows',
             enabled: true,
-            description: 'List all workflows from n8n with essential metadata only (ID, name, status, dates, node count, tags). Optimized for performance to prevent large data transfers.',
-            inputSchema: { 
-              type: 'object', 
+            description: 'List all workflows from n8n with essential metadata only (ID, name, status, dates, node count, tags). Supports pagination for large datasets.',
+            inputSchema: {
+              type: 'object',
               properties: {
-                random_string: {
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of workflows to return (default: 100, max: 250)'
+                },
+                cursor: {
                   type: 'string',
-                  description: 'Dummy parameter for no-parameter tools'
+                  description: 'Cursor for pagination (from previous response nextCursor)'
                 },
                 instance: {
                   type: 'string',
@@ -780,6 +785,20 @@ class N8NWorkflowServer {
               },
               required: ['id']
             }
+          },
+          {
+            name: 'list_instances',
+            enabled: true,
+            description: 'List available n8n instances and their configurations, including workflow mappings and usage guidelines',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                instance: {
+                  type: 'string',
+                  description: 'Optional instance name (not used for this tool but included for consistency)'
+                }
+              }
+            }
           }
         ]
       };
@@ -797,11 +816,14 @@ class N8NWorkflowServer {
           switch (toolName) {
             case 'list_workflows':
               try {
-                const workflows = await this.n8nWrapper.listWorkflows(args.instance);
+                const workflows = await this.n8nWrapper.listWorkflows(
+                  { limit: args.limit, cursor: args.cursor },
+                  args.instance
+                );
                 return {
-                  content: [{ 
-                    type: 'text', 
-                    text: JSON.stringify(workflows, null, 2) 
+                  content: [{
+                    type: 'text',
+                    text: JSON.stringify(workflows, null, 2)
                   }]
                 };
               } catch (error: any) {
@@ -1318,6 +1340,9 @@ class N8NWorkflowServer {
                   text: JSON.stringify(deletedTag, null, 2) 
                 }]
               };
+
+            case 'list_instances':
+              return await handleListInstances(args);
             
             default:
               throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);

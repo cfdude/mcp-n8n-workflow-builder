@@ -165,7 +165,7 @@ export function validateWorkflowSpec(input: WorkflowInput): WorkflowSpec {
       // Use target node name for connection with proper type
       connections[sourceNode.name]!.main[sourceOutput]!.push({
         node: targetNode.name,
-        type: NodeConnectionType.Main,
+        type: 'main',
         index: conn.targetInput || 0
       });
     });

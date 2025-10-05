@@ -1,6 +1,14 @@
 import { ExecutionData, ExecutionMode } from './execution';
 import { Tag } from './tag';
 
+/**
+ * Generic paginated response structure for n8n API
+ */
+export interface PaginatedResponse<T> {
+  data: T[];
+  nextCursor?: string;
+}
+
 export interface N8NWorkflowResponse {
   id: string;
   name: string;
@@ -28,6 +36,14 @@ export interface N8NWorkflowSummary {
   tags?: string[];
   folder?: string;
   nodeCount?: number;
+}
+
+/**
+ * Response structure when listing workflows with pagination
+ */
+export interface N8NWorkflowListResponse {
+  data: N8NWorkflowSummary[];
+  nextCursor?: string;
 }
 
 /**
