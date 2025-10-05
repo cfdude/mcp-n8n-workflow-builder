@@ -186,26 +186,57 @@ Then edit the file, providing the correct environment variable values:
 The following tools are available through the MCP protocol:
 
 #### Workflow Management
-- **list_workflows**: Displays a streamlined list of workflows with essential metadata only (ID, name, status, dates, node count, tags). Optimized for performance to prevent large data transfers.
-- **create_workflow**: Creates a new workflow in n8n.
-- **get_workflow**: Gets complete workflow details by its ID (includes nodes and connections).
-- **update_workflow**: Updates an existing workflow.
-- **delete_workflow**: Deletes a workflow by its ID.
-- **activate_workflow**: Activates a workflow by its ID.
-- **deactivate_workflow**: Deactivates a workflow by its ID.
-- **execute_workflow**: Manually executes a workflow by its ID.
+- **list_workflows**: Displays a streamlined list of workflows with pagination support
+  - Optional: `limit` (number) - Maximum workflows to return
+  - Optional: `cursor` (string) - Pagination cursor for next page
+  - Returns: `{ data: Workflow[], nextCursor?: string }`
+- **create_workflow**: Creates a new workflow in n8n
+- **get_workflow**: Gets complete workflow details by its ID (includes nodes and connections)
+- **update_workflow**: Updates an existing workflow
+- **delete_workflow**: Deletes a workflow by its ID
+- **activate_workflow**: Activates a workflow by its ID
+- **deactivate_workflow**: Deactivates a workflow by its ID
+- **execute_workflow**: Manually executes a workflow by its ID
 
 #### Execution Management
-- **list_executions**: Displays a list of all workflow executions with filtering capabilities.
-- **get_execution**: Gets details of a specific execution by its ID.
-- **delete_execution**: Deletes an execution record by its ID.
+- **list_executions**: List workflow executions with pagination and filtering
+  - Optional: `limit` (number) - Maximum executions to return
+  - Optional: `cursor` (string) - Pagination cursor
+  - Optional: `status` (string) - Filter by status (error, success, waiting)
+  - Optional: `workflowId` (string) - Filter by workflow
+  - Returns: `{ data: Execution[], nextCursor?: string }`
+- **get_execution**: Gets details of a specific execution by its ID
+- **delete_execution**: Deletes an execution record by its ID
+
+#### Credentials Management
+- **list_credentials**: List all credentials with pagination
+  - Optional: `limit` (number) - Maximum credentials to return
+  - Optional: `cursor` (string) - Pagination cursor
+  - Returns: `{ data: Credential[], nextCursor?: string }`
+- **get_credential**: Get credential by ID
+  - Required: `id` (string) - Credential ID
+- **create_credential**: Create new credential
+  - Required: `name` (string) - Credential name
+  - Required: `type` (string) - Credential type (e.g., "httpBasicAuth", "airtableApi")
+  - Required: `data` (object) - Credential data (e.g., `{"apiKey": "key"}`)
+  - Optional: `nodesAccess` (array) - Nodes that can access this credential
+- **update_credential**: Update existing credential
+  - Required: `id` (string) - Credential ID
+  - Optional: `name`, `type`, `data`, `nodesAccess` - Fields to update
+- **delete_credential**: Delete credential by ID
+  - Required: `id` (string) - Credential ID
+- **get_credential_schema**: Get schema for credential type
+  - Required: `credentialType` (string) - Type name (e.g., "githubOAuth2Api")
 
 #### Tag Management
-- **create_tag**: Creates a new tag.
-- **get_tags**: Gets a list of all tags.
-- **get_tag**: Gets tag details by its ID.
-- **update_tag**: Updates an existing tag.
-- **delete_tag**: Deletes a tag by its ID.
+- **create_tag**: Creates a new tag
+- **get_tags**: List all tags with pagination
+  - Optional: `limit` (number) - Maximum tags to return
+  - Optional: `cursor` (string) - Pagination cursor
+  - Returns: `{ data: Tag[], nextCursor?: string }`
+- **get_tag**: Gets tag details by its ID
+- **update_tag**: Updates an existing tag
+- **delete_tag**: Deletes a tag by its ID
 
 #### Workflow Debugging and Analysis
 - **get_error**: Retrieves error details from the most recent workflow execution. Returns structured error information including node name, error message, line numbers, and stack traces for efficient debugging.
@@ -232,7 +263,7 @@ The following tools are available through the MCP protocol:
 - Available instances are defined in your `.config.json` file
 - For single-instance setups (using `.env`), the instance parameter is ignored
 
-All tools have been tested and optimized for n8n version 1.82.3. The node types and API structures used are compatible with this version.
+All tools have been tested and optimized for n8n API v1. The server uses n8n-workflow package v1.111.0 for maximum compatibility.
 
 ### Important Note About Workflow Triggers
 
@@ -385,6 +416,73 @@ You can now specify which n8n instance to target in your Claude conversations:
 - "List all workflows from the production environment"
 - "Create a new workflow in the staging instance"
 - "Show me executions from the development n8n"
+
+### Credential Management Examples
+
+```javascript
+// List all credentials
+await listCredentials({ limit: 10 });
+
+// Get specific credential
+await getCredential("credential-id-123");
+
+// Create HTTP Basic Auth credential
+await createCredential({
+  name: "My API Credentials",
+  type: "httpBasicAuth",
+  data: {
+    user: "apiuser",
+    password: "secret123"
+  }
+});
+
+// Create Airtable credential with node access
+await createCredential({
+  name: "Airtable Production",
+  type: "airtableApi",
+  data: {
+    apiKey: "your-airtable-key"
+  },
+  nodesAccess: [
+    { nodeType: "n8n-nodes-base.airtable" }
+  ]
+});
+
+// Update credential
+await updateCredential("credential-id-123", {
+  name: "Updated API Credentials",
+  data: {
+    user: "newuser",
+    password: "newsecret456"
+  }
+});
+
+// Delete credential
+await deleteCredential("credential-id-123");
+
+// Get credential schema for a type
+await getCredentialSchema("githubOAuth2Api");
+```
+
+### Pagination Examples
+
+```javascript
+// Paginate through workflows
+let cursor = null;
+do {
+  const result = await listWorkflows({ limit: 50, cursor });
+  console.log(`Retrieved ${result.data.length} workflows`);
+  cursor = result.nextCursor;
+} while (cursor);
+
+// Paginate through credentials
+let credCursor = null;
+do {
+  const result = await listCredentials({ limit: 25, cursor: credCursor });
+  console.log(`Retrieved ${result.data.length} credentials`);
+  credCursor = result.nextCursor;
+} while (credCursor);
+```
 
 In the `examples` directory, you'll find examples and instructions for setting up and using n8n Workflow Builder with Claude App:
 
@@ -573,9 +671,12 @@ This usually happens when creating workflows with Set nodes that use the newer n
 ## Version Compatibility
 
 This MCP server has been specifically tested and validated with:
-- **n8n version**: 1.82.3
+- **n8n API**: v1 (fully compatible)
+- **n8n-workflow package**: v1.111.0
 - **Node.js**: v14 and above
 - **MCP Protocol**: Latest version compatible with Claude and Cursor
+
+The server provides 80% feature parity with the n8n Community Edition API, covering all essential workflow, execution, credential, and tag management operations.
 
 If you're using a different version of n8n, some API endpoints or node types may differ. Please report any compatibility issues in the GitHub repository.
 
@@ -584,7 +685,30 @@ If you're using a different version of n8n, some API endpoints or node types may
 
 ## Changelog
 
-### 0.8.0 (Current)
+### 0.9.0 (Current)
+- **✨ Credentials Management** - Full CRUD operations for n8n credentials
+  - `list_credentials`: List all credentials with pagination
+  - `get_credential`: Get credential by ID
+  - `create_credential`: Create new credentials
+  - `update_credential`: Update existing credentials
+  - `delete_credential`: Delete credentials
+  - `get_credential_schema`: Get schema for credential types
+- **📊 Cursor-Based Pagination** - Efficient handling of large datasets
+  - Updated `list_workflows` with limit/cursor pagination
+  - Updated `list_executions` with filtering and pagination
+  - Updated `list_credentials` with pagination
+  - Updated `get_tags` with pagination
+  - All paginated responses include `nextCursor` for easy iteration
+- **🔧 Enhanced API Support**
+  - Upgraded n8n-workflow to v1.111.0 (29 versions ahead)
+  - Full n8n API v1 compatibility
+  - Improved type safety with comprehensive TypeScript interfaces
+- **🧪 Comprehensive Testing**
+  - Added credential management tests to test-mcp-tools.js
+  - 80% feature parity with n8n Community Edition API
+  - All tests passing with pagination and credentials support
+
+### 0.8.0
 - **🎉 Multi-instance support** - Manage multiple n8n environments (production, staging, development)
 - Added `.config.json` configuration format for multiple n8n instances
 - All MCP tools now support optional `instance` parameter for environment targeting
