@@ -21,6 +21,9 @@ CLAUDE.md
 .claude/
 .mcp.json
 
+# Serena MCP project tracking (contains project-specific implementation details)
+.serena/
+
 # Build files
 /build
 /dist
